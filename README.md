@@ -99,8 +99,10 @@ curl -s -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
   "$SERVICE_URL/?reset=1"
 ```
 
-It costs one duplicate observation per vehicle, at timestamps EarthRanger
-already holds. Use it once, not on a schedule.
+Every other vehicle is re-sent at a timestamp EarthRanger already holds, and
+EarthRanger rejects each of those with `409 Conflict` rather than storing a
+duplicate — so the run logs a wall of 409 warnings and that is the expected,
+harmless outcome. Use it once, not on a schedule.
 
 > The reset cursor is per-credential and shared by every client using it. Only
 > this service should ever request the reset — a second poller asking for it
