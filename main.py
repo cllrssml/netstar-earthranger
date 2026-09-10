@@ -57,11 +57,23 @@ session.headers.update({
 
 @functions_framework.http
 def netstar_sync_handler(request):
-    """Entry point for the Cloud Run Function."""
-    print(f"🚜 STARTING SYNC ({datetime.now().strftime('%H:%M:%S')})")
+    """Entry point for the Cloud Run Function.
+
+    ?reset=1 asks Netstar for every vehicle's current position instead of only
+    what changed since the last poll. Use it once after adding a vehicle to a
+    Profleet group: the normal feed is a delta, so a parked vehicle stays
+    invisible until it is next driven, which can be many hours. Costs one
+    duplicate observation per vehicle, at timestamps ER already holds.
+    Never call the reset from a second client -- the delta cursor is
+    per-credential and shared, so a competing poller consumes the snapshot
+    this service is meant to receive.
+    """
+    reset = str(request.args.get("reset", "")).lower() in ("1", "true", "yes")
+    print(f"🚜 STARTING SYNC ({datetime.now().strftime('%H:%M:%S')})"
+          f"{' [RESET: full snapshot]' if reset else ''}")
 
     try:
-        run_sync_logic()
+        run_sync_logic(reset=reset)
         return "OK", 200
     except Exception as e:
         print(f"❌ Critical Error: {e}")
@@ -193,7 +205,7 @@ def link_source(source_id, subject_id, label):
     else:
         print(f"   ❌ Link HTTP {r.status_code}: {r.text[:200]}")
 
-def run_sync_logic():
+def run_sync_logic(reset=False):
     known_sources = get_er_cache()
     xml = f"""<?xml version="1.0" encoding="utf-8"?>
     <soap:Envelope xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
@@ -206,7 +218,7 @@ def run_sync_logic():
             </Credentials>
             <RequestId>{str(uuid.uuid4())}</RequestId>
             <Compress>false</Compress>
-            <Reset>false</Reset>
+            <Reset>{"true" if reset else "false"}</Reset>
           </Request>
         </{SOAP_OP}>
       </soap:Body>

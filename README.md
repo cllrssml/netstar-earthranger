@@ -83,6 +83,29 @@ An ungrouped vehicle is not returned, no matter how healthy its tracker, so it
 will never reach EarthRanger. Check group membership first if a vehicle is
 missing.
 
+### Forcing a full snapshot
+
+The feed is a delta: each poll returns only what changed since the last one. A
+vehicle that has just been added to a group therefore stays invisible until it
+next reports a position, which for a parked vehicle can be many hours.
+
+Calling the function with `?reset=1` asks Netstar for every vehicle's current
+position instead, so a newly added vehicle registers immediately:
+
+```bash
+SERVICE_URL=$(gcloud run services describe netstar-sync --region us-central1 \
+  --format='value(status.url)')
+curl -s -H "Authorization: Bearer $(gcloud auth print-identity-token)" \
+  "$SERVICE_URL/?reset=1"
+```
+
+It costs one duplicate observation per vehicle, at timestamps EarthRanger
+already holds. Use it once, not on a schedule.
+
+> The reset cursor is per-credential and shared by every client using it. Only
+> this service should ever request the reset — a second poller asking for it
+> consumes the snapshot this one is waiting for.
+
 ## Gundi
 
 This integration is being developed with the goal of eventual adoption into the [Gundi](https://github.com/PADAS) open conservation data platform. Contributions and feedback from the conservation tech community are welcome.
