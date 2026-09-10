@@ -56,12 +56,32 @@ Create a Cloud Scheduler job to POST to the Cloud Run URL every 2 minutes.
 | `ER_TOKEN` | EarthRanger bearer token |
 | `NETSTAR_USER` | Netstar SOAP API username |
 | `NETSTAR_PASS` | Netstar SOAP API password |
+| `DEFAULT_SUBTYPE` | Optional. EarthRanger `subject_subtype` given to newly-discovered vehicles. Defaults to `truck_3`. Must be a subtype that already exists on your site. |
+| `VEHICLE_OVERRIDES` | Optional. JSON object keyed by tracker IMEI, overriding the name and/or subtype used when a vehicle is first created — e.g. `{"860000000000000": {"name": "ABC123 - Truck", "subtype": "car"}}`. Useful when the tracking provider holds a stale registration for a vehicle. Applied at creation time only. |
 
 ## EarthRanger data model
 
 - **Provider key**: `netstar_fleet_api`
-- **Subject subtype**: `vehicle`
-- **Observation additional fields**: `speed_kmh`, `ignition`, `netstar_id`
+- **Source**: one per tracker, `source_type` `tracking-device`, `manufacturer_id` = the tracker IMEI
+- **Subject subtype**: `DEFAULT_SUBTYPE` (`truck_3` unless overridden). `subject_type` is read-only in EarthRanger and is derived from the subtype, so the subtype must be one your site already defines.
+- **Observation additional fields**: `speed_kmh`, `ignition`, `netstar_id`, `status`, `emergencydistressalarm`, `rolloveralert`
+
+### Automatic registration
+
+A vehicle that appears in the Netstar feed for the first time gets its Source,
+Subject and subject-source link created automatically. It is named from the
+feed's `VehicleName` — the vehicle's name in Profleet — falling back to
+`Vehicle <last 4 of IMEI>` if the feed carries no name.
+
+The feed polled is `GetVehicleLocationsWithAlarms`, which returns
+`GpsLocationWithAlarm`: a strict superset of the `GpsLocationClass` returned by
+`GetVehicleLocations`, adding `VehicleName`, `TrackerID`, `Status` and the alarm
+flags.
+
+**A vehicle must belong to a group in Profleet to appear in the feed at all.**
+An ungrouped vehicle is not returned, no matter how healthy its tracker, so it
+will never reach EarthRanger. Check group membership first if a vehicle is
+missing.
 
 ## Gundi
 
